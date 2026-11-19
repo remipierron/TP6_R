@@ -511,13 +511,214 @@ colSums(is.na(contacts_propres))
 
 ## C1
 
+```{r C1}
+lignes <- read_lines("data/journal_serveur.log")
+n_lignes <- length(lignes)
+n_lignes
+head(lignes, 3)
+
+# Les crochets sont des métacaractères : on les échappe pour chercher « [INFO] » littéralement
+niveaux_compte <- c(
+  INFO  = sum(str_detect(lignes, "\\[INFO\\]")),
+  WARN  = sum(str_detect(lignes, "\\[WARN\\]")),
+  ERROR = sum(str_detect(lignes, "\\[ERROR\\]"))
+)
+niveaux_compte
+sum(niveaux_compte) == n_lignes
+```
+
+**Réponse :** le journal contient `r n_lignes` lignes : `r paste(niveaux_compte, names(niveaux_compte), collapse = ", ")`. La somme vaut bien `r sum(niveaux_compte)`, donc chaque ligne a exactement un niveau. On cherche `[ERROR]` avec ses crochets (et non `ERROR` seul) pour ne pas compter une ligne qui contiendrait ce mot ailleurs, par exemple dans un message.
+
 ## C2
+
+Chaque champ est extrait avec `str_match()` et un groupe de capture ; la colonne `[, 2]` contient le contenu du groupe, et vaut `NA` quand le champ est absent de la ligne (cas de `fichier` et `msg`).
+
+```{r C2}
+log <- tibble(ligne = lignes) |>
+  mutate(
+    horodatage = ymd_hms(str_extract(ligne, "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}")),
+    niveau     = str_match(ligne, "\\[(\\w+)\\]")[, 2],
+    user       = na_if(str_match(ligne, "user=(\\S+)")[, 2], "-"),
+    ip         = str_match(ligne, "ip=(\\S+)")[, 2],
+    action     = str_match(ligne, "action=(\\S+)")[, 2],
+    fichier    = str_match(ligne, "fichier=(\\S+)")[, 2],
+    code       = as.integer(str_match(ligne, "code=(\\d+)")[, 2]),
+    duree      = as.numeric(str_match(ligne, "duree=(\\d+)ms")[, 2]),
+    msg        = str_match(ligne, 'msg="([^"]*)"')[, 2]
+  ) |>
+  select(-ligne)
+
+log
+colSums(is.na(log))
+```
+
+**Réponse :** le tibble `log` a `r nrow(log)` lignes et `r ncol(log)` colonnes. Aucune valeur manquante dans `horodatage`, `niveau`, `ip`, `action`, `code` et `duree` (`r sum(is.na(select(log, horodatage, niveau, ip, action, code, duree)))` NA au total), ce qui confirme que toutes les lignes ont été lues. Les `NA` de `user` (`r sum(is.na(log$user))`), `fichier` (`r sum(is.na(log$fichier))`) et `msg` (`r sum(is.na(log$msg))`) correspondent aux requêtes anonymes et aux champs absents.
 
 ## C3
 
+### a. Requêtes par jour et par niveau
+
+```{r C3a}
+par_jour <- log |>
+  count(jour = as_date(horodatage), niveau) |>
+  pivot_wider(names_from = niveau, values_from = n, values_fill = 0) |>
+  select(jour, INFO, WARN, ERROR) |>
+  mutate(total = INFO + WARN + ERROR)
+par_jour
+```
+
+**Réponse :** le journal couvre `r nrow(par_jour)` jours, du `r format(min(par_jour$jour), "%d/%m/%Y")` au `r format(max(par_jour$jour), "%d/%m/%Y")`. Le jour le plus chargé est le `r format(par_jour$jour[which.max(par_jour$total)], "%d/%m/%Y")` (`r max(par_jour$total)` requêtes) et celui qui compte le plus d'erreurs est le `r format(par_jour$jour[which.max(par_jour$ERROR)], "%d/%m/%Y")` (`r max(par_jour$ERROR)` erreurs).
+
+### b. Heure la plus sollicitée
+
+```{r C3b}
+par_heure <- log |>
+  count(heure = hour(horodatage))
+
+par_heure |> arrange(desc(n)) |> slice_head(n = 5)
+
+ggplot(par_heure, aes(x = heure, y = n)) +
+  geom_col(fill = "steelblue") +
+  scale_x_continuous(breaks = 0:23) +
+  labs(x = "Heure de la journée", y = "Nombre de requêtes",
+       title = "Requêtes par heure (3 jours cumulés)")
+```
+
+```{r C3b-max, include=FALSE}
+heures_max <- par_heure$heure[par_heure$n == max(par_heure$n)]
+```
+
+**Réponse :** tous jours confondus, le serveur est le plus sollicité à `r paste0(heures_max, " h", collapse = " et ")` avec `r max(par_heure$n)` requêtes (contre `r round(mean(par_heure$n), 1)` en moyenne par heure).
+
+### c. Utilisateurs avec le plus d'erreurs, part des requêtes anonymes
+
+```{r C3c}
+erreurs_user <- log |>
+  filter(niveau == "ERROR") |>
+  count(user, sort = TRUE)
+erreurs_user |> slice_head(n = 5)
+
+part_anonyme <- mean(is.na(log$user))
+part_anonyme
+```
+
+**Réponse :** les utilisateurs ayant le plus d'erreurs sont `r paste0(erreurs_user$user[1:3], " (", erreurs_user$n[1:3], ")", collapse = ", ")`. Les requêtes anonymes (`user=-`) représentent `r sum(is.na(log$user))` requêtes sur `r nrow(log)`, soit `r round(100 * part_anonyme, 1)` %.
+
 ## C4
 
+### a. Durée médiane et 90^e^ centile par action
+
+```{r C4a}
+durees_action <- log |>
+  group_by(action) |>
+  summarise(n = n(),
+            mediane = median(duree),
+            centile_90 = quantile(duree, 0.9)) |>
+  arrange(desc(mediane))
+durees_action
+```
+
+**Réponse :** l'action la plus lente est `r durees_action$action[1]` (médiane `r durees_action$mediane[1]` ms, 90^e^ centile `r durees_action$centile_90[1]` ms), la plus rapide `r durees_action$action[nrow(durees_action)]` (médiane `r durees_action$mediane[nrow(durees_action)]` ms). Le 90^e^ centile signifie que 10 % des requêtes de chaque action durent plus longtemps que cette valeur.
+
+### b. Durée médiane par niveau
+
+```{r C4b}
+durees_niveau <- log |>
+  group_by(niveau) |>
+  summarise(n = n(), mediane = median(duree), moyenne = mean(duree))
+durees_niveau
+```
+
+```{r C4b-ratio, include=FALSE}
+med_error <- durees_niveau$mediane[durees_niveau$niveau == "ERROR"]
+med_info  <- durees_niveau$mediane[durees_niveau$niveau == "INFO"]
+```
+
+**Réponse :** `r if (med_error > med_info) "oui" else "non"`, la durée médiane des requêtes en erreur est de `r med_error` ms contre `r med_info` ms pour les requêtes INFO, soit `r round(med_error / med_info, 1)` fois `r if (med_error > med_info) "plus" else "moins"`. C'est cohérent avec les messages d'erreur (délais d'attente, mémoire insuffisante) : une requête qui échoue a souvent attendu longtemps avant d'échouer.
+
+### c. Messages d'erreur
+
+```{r C4c}
+messages <- log |>
+  filter(!is.na(msg)) |>
+  count(niveau, msg, sort = TRUE)
+messages
+```
+
+**Réponse :** on trouve `r n_distinct(messages$msg)` messages différents : `r paste0("« ", messages$msg, " » (", messages$n, ")", collapse = ", ")`. Ils apparaissent sur `r sum(messages$n)` lignes, toutes de niveau `r paste(unique(messages$niveau), collapse = " et ")`.
+
+### d. Fichiers téléchargés avec succès, par extension
+
+```{r C4d}
+telechargements <- log |>
+  filter(action == "download", code == 200) |>
+  mutate(extension = str_extract(fichier, "(?<=\\.)[[:alnum:]]+$"))
+
+telechargements |> count(fichier, sort = TRUE)
+
+par_extension <- telechargements |> count(extension, sort = TRUE)
+par_extension
+```
+
+**Réponse :** `r nrow(telechargements)` téléchargements ont réussi. Le fichier le plus téléchargé est `r count(telechargements, fichier, sort = TRUE)$fichier[1]` (`r count(telechargements, fichier, sort = TRUE)$n[1]` fois). Par extension : `r paste0(par_extension$extension, " (", par_extension$n, ")", collapse = ", ")`.
+
 ## C5
+
+### a. Requêtes venant de l'extérieur
+
+Les points de `192.168.` doivent être échappés, et le motif ancré au début : sans ancre, une adresse comme `10.192.168.1` serait considérée comme interne.
+
+```{r C5a}
+log <- log |>
+  mutate(externe = !str_detect(ip, "^192\\.168\\."))
+
+n_externes <- sum(log$externe)
+n_ip_externes <- n_distinct(log$ip[log$externe])
+n_externes
+n_ip_externes
+```
+
+**Réponse :** `r n_externes` requêtes sur `r nrow(log)` (`r round(100 * n_externes / nrow(log), 1)` %) viennent de l'extérieur du réseau interne, depuis `r n_ip_externes` adresses distinctes (`r paste(unique(log$ip[log$externe]), collapse = " et ")`).
+
+### b. Profil des adresses extérieures
+
+```{r C5b}
+ip_externes <- log |>
+  filter(externe) |>
+  group_by(ip) |>
+  summarise(requetes     = n(),
+            utilisateurs = n_distinct(user, na.rm = TRUE),
+            erreurs      = sum(niveau == "ERROR"),
+            refus        = sum(code %in% c(401, 429)),
+            nuit         = sum(hour(horodatage) < 7)) |>
+  arrange(desc(utilisateurs))
+ip_externes
+
+# Liste des comptes utilisés depuis chaque adresse
+log |>
+  filter(externe) |>
+  group_by(ip) |>
+  summarise(comptes = str_c(sort(unique(user)), collapse = ", ")) |>
+  as.data.frame()
+```
+
+```{r C5b-suspecte, include=FALSE}
+ip_susp  <- ip_externes |> slice_max(utilisateurs, n = 1)
+ip_autre <- ip_externes |> filter(ip != ip_susp$ip)
+```
+
+**Réponse :** les adresses extérieures ne produisent `r if (sum(ip_externes$erreurs + ip_externes$refus) == 0) "**aucune** erreur ni aucun refus" else paste(sum(ip_externes$erreurs), "erreur(s) et", sum(ip_externes$refus), "refus")`, donc ce n'est pas ce critère qui les distingue. La plus suspecte est **`r ip_susp$ip`** : `r ip_susp$requetes` requêtes réparties entre **`r ip_susp$utilisateurs` comptes différents**, dont `r ip_susp$nuit` entre minuit et 7 h. Une même adresse extérieure qui se connecte avec autant de comptes, sans jamais échouer, évoque des identifiants volés ou partagés plutôt qu'un utilisateur légitime en télétravail (qui utiliserait un seul compte). L'absence de refus est même inquiétante : les mots de passe utilisés sont tous valides. L'autre adresse, `r ip_autre$ip`, mérite aussi d'être surveillée : ses `r ip_autre$requetes` requêtes utilisent `r ip_autre$utilisateurs` comptes différents, mais son volume est bien plus faible.
+
+### c. Format IPv4
+
+```{r C5c}
+motif_ipv4 <- "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"
+ip_ok <- str_detect(log$ip, motif_ipv4)
+all(ip_ok)
+log$ip[!ip_ok]
+```
+
+**Réponse :** `r if (all(ip_ok)) paste("**toutes** les", length(ip_ok), "adresses ont bien la forme d'une adresse IPv4") else paste(sum(!ip_ok), "adresse(s) n'ont pas la forme d'une adresse IPv4")`. Cette regex ne vérifie que la forme : elle accepterait par exemple `999.1.1.1`, alors que chaque nombre d'une vraie adresse IPv4 est compris entre 0 et 255.
 
 # Partie D : Analyse textuelle d'avis clients
 

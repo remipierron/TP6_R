@@ -1,0 +1,224 @@
+---
+title: "TP 6 : Texte et expressions régulières"
+author: "Rémi Pierron"
+date: "2026-11-19"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+# Partie A : Fonctions de texte et premières regex
+
+## A1
+
+### Prédictions (écrites avant l'exécution)
+
+| Instruction | Prédiction |
+|---|---|
+| `nchar("Été 2026 ")` | `9` : « Été » (3), l'espace, « 2026 » (4) et l'espace final ; le « É » accentué compte pour **un** caractère. |
+| `str_sub("Conservatoire", -5)` | `"toire"` : un indice négatif part de la fin, on garde les 5 derniers caractères. |
+| `str_detect(c("a.b", "axb", "ab"), "a.b")` | `TRUE TRUE FALSE` : le `.` est un métacaractère qui remplace **n'importe quel** caractère, mais il en faut exactement un entre `a` et `b`. |
+| `str_detect(c("a.b", "axb", "ab"), "a\\.b")` | `TRUE FALSE FALSE` : `\\.` désigne un point littéral. |
+| `str_count("banana", "an")` | `2` : « b**an****an**a ». |
+| `str_replace("aaa", "a", "b")` | `"baa"` : `str_replace()` ne remplace que la **première** occurrence. |
+| `str_extract("Tel : 06 12 34 56 78", "\\d+")` | `"06"` : première suite de chiffres, qui s'arrête au premier espace. |
+| `str_split("a,b,,c", ",")` | une **liste** contenant `c("a", "b", "", "c")` : les deux virgules consécutives produisent une chaîne vide. |
+
+### Exécution
+
+```{r A1}
+nchar("Été 2026 ")
+str_sub("Conservatoire", -5)
+str_detect(c("a.b", "axb", "ab"), "a.b")
+str_detect(c("a.b", "axb", "ab"), "a\\.b")
+str_count("banana", "an")
+str_replace("aaa", "a", "b")
+str_extract("Tel : 06 12 34 56 78", "\\d+")
+str_split("a,b,,c", ",")
+```
+
+**Réponse :** les résultats correspondent aux prédictions. Les pièges à retenir sont :
+
+- `nchar()` compte des **caractères** et non des octets : « É » vaut 1 (il en vaudrait 2 avec `nchar(type = "bytes")`), et l'espace final est compté ;
+- dans une regex, `.` signifie « n'importe quel caractère » : pour chercher un vrai point il faut l'échapper (`\\.`) ;
+- `str_replace()` ne modifie que la première occurrence (il faut `str_replace_all()` pour toutes), et `str_extract()` ne renvoie que la première correspondance (`str_extract_all()` pour toutes) ;
+- `str_split()` renvoie toujours une **liste** (un élément par chaîne d'entrée), même avec une seule chaîne, et conserve les morceaux vides.
+
+## A2
+
+```{r A2-donnees}
+villes <- c("  paris", "SAINT-ÉTIENNE ", "aix-en-provence", "Le  Mans", "nîmes")
+```
+
+### a. Nettoyer et mettre une majuscule à chaque mot
+
+`str_squish()` retire les espaces en début et fin de chaîne **et** réduit les espaces multiples internes à un seul ; `str_to_title()` met une majuscule au début de chaque mot (et le reste en minuscules).
+
+```{r A2a}
+villes_propres <- villes |>
+  str_squish() |>
+  str_to_title()
+villes_propres
+```
+
+**Réponse :** le résultat de `"aix-en-provence"` n'est **pas** correct : on obtient `"`r villes_propres[3]`"` au lieu de `"Aix-en-Provence"`. `str_to_title()` considère le tiret comme une séparation de mots et met donc une majuscule à « en ». On peut corriger les petits mots de liaison entourés de tirets :
+
+```{r A2a-correction}
+villes_propres <- villes_propres |>
+  str_replace_all("-(En|Le|La|Les|De|Du|Des|Sur|Sous)-", str_to_lower)
+villes_propres
+```
+
+### b. Alignement à droite sur 20 caractères
+
+`str_pad(side = "left")` complète avec des espaces **à gauche**, ce qui aligne le texte à droite.
+
+```{r A2b}
+villes_alignees <- str_c(
+  str_pad(villes_propres, width = 20, side = "left"),
+  " (", str_length(villes_propres), ")"
+)
+villes_alignees
+```
+
+Avec `cat()`, on voit bien l'alignement (une ville par ligne) :
+
+```{r A2b-affichage}
+cat(villes_alignees, sep = "\n")
+```
+
+### c. Sans accents, en majuscules, tirets à la place des espaces
+
+La suppression des accents utilise `stringi::stri_trans_general()` avec la translittération `"Latin-ASCII"` (stringi est installé avec le tidyverse, stringr s'appuie dessus).
+
+```{r A2c}
+villes_codes <- villes_propres |>
+  stringi::stri_trans_general("Latin-ASCII") |>
+  str_to_upper() |>
+  str_replace_all(" ", "-")
+villes_codes
+```
+
+**Réponse :** on obtient `r paste0("\x60", villes_codes, "\x60", collapse = ", ")`.
+
+## A3
+
+```{r A3-donnees}
+codes <- c("FR-2024-00123", "FR-2025-04567", "DE-2025-00089", "fr-2023-1", "FR2025-00999",
+           "IT-2024-12345", "FR-2026-00042", "ES-2025-0071")
+```
+
+### a. Regex de validation
+
+La regex est ancrée au début (`^`) et à la fin (`$`) pour que **toute** la chaîne respecte le format (sinon un code plus long que prévu serait accepté).
+
+```{r A3a}
+motif_code <- "^[A-Z]{2}-\\d{4}-\\d{5}$"
+code_valide <- str_detect(codes, motif_code)
+codes[!code_valide]
+```
+
+**Réponse :** `r sum(!code_valide)` codes sont invalides : `"fr-2023-1"` (lettres en minuscules et numéro sur 1 chiffre), `"FR2025-00999"` (tiret manquant après le pays) et `"ES-2025-0071"` (numéro sur 4 chiffres seulement).
+
+### b. Extraire pays, année et numéro
+
+`str_match()` renvoie une matrice : la 1^re^ colonne contient la correspondance complète, les suivantes le contenu de chaque groupe de capture `( )`.
+
+```{r A3b}
+codes_detail <- str_match(codes[code_valide], "^([A-Z]{2})-(\\d{4})-(\\d{5})$")
+codes_detail
+
+codes_tbl <- tibble(
+  pays   = codes_detail[, 2],
+  annee  = as.integer(codes_detail[, 3]),
+  numero = codes_detail[, 4]   # gardé en texte pour conserver les zéros initiaux
+)
+codes_tbl
+```
+
+### c. Nombre de codes valides par pays
+
+```{r A3c}
+codes_par_pays <- codes_tbl |>
+  count(pays, sort = TRUE)
+codes_par_pays
+```
+
+**Réponse :** sur les `r nrow(codes_tbl)` codes valides, `r paste(codes_par_pays$n, "pour", codes_par_pays$pays, collapse = ", ")`.
+
+## A4
+
+```{r A4-donnees}
+x <- c("rapport.pdf", "photo.PNG", "notes.pdf.bak", "data_pdf")
+```
+
+Erreurs trouvées **à la lecture** (sans exécuter) :
+
+1. `str_subset(x, ".pdf")` : le `.` non échappé remplace n'importe quel caractère, donc `"data_pdf"` correspond (`_pdf`) ; et faute d'ancre `$`, `"notes.pdf.bak"` correspond aussi. Il faut un point littéral **en fin** de nom : `"\\.pdf$"`.
+2. `str_detect("prix : 1500 €", "^\\d+$")` : les ancres `^` et `$` imposent que la chaîne **entière** soit composée de chiffres, ce qui est faux ici (il y a « prix : » et « € »). Pour savoir si elle *contient* un nombre, on retire les ancres : `"\\d+"`.
+3. `str_replace("2026-01-15", ...)` : il n'y a en fait **pas d'erreur**, l'instruction renvoie bien `"15/01/2026"` (les références arrière `\\1`, `\\2`, `\\3` s'écrivent bien ainsi dans le remplacement avec stringr). On peut seulement rendre le motif plus strict, avec des ancres et le nombre exact de chiffres : `"^(\\d{4})-(\\d{2})-(\\d{2})$"`.
+4. `str_detect(c("Photo", "photo"), "^photo")` : les regex sont **sensibles à la casse**, donc `"Photo"` n'est pas détecté. Il faut `regex("^photo", ignore_case = TRUE)`.
+
+Vérification : instructions d'origine, puis versions corrigées.
+
+```{r A4-origine}
+str_subset(x, ".pdf")                                               # 1. fichiers PDF
+str_detect("prix : 1500 €", "^\\d+$")                               # 2. contient un nombre ?
+str_replace("2026-01-15", "(\\d+)-(\\d+)-(\\d+)", "\\3/\\2/\\1")    # 3. OK ?
+str_detect(c("Photo", "photo"), "^photo")                           # 4. début « photo », toute casse
+```
+
+```{r A4-corrige}
+str_subset(x, "\\.pdf$")                                                 # 1.
+str_detect("prix : 1500 €", "\\d+")                                      # 2.
+str_replace("2026-01-15", "^(\\d{4})-(\\d{2})-(\\d{2})$", "\\3/\\2/\\1") # 3.
+str_detect(c("Photo", "photo"), regex("^photo", ignore_case = TRUE))     # 4.
+```
+
+**Réponse :** les versions corrigées renvoient bien le seul fichier PDF (`"rapport.pdf"`), `TRUE` pour la présence d'un nombre, `"15/01/2026"` pour la date (déjà correcte à l'origine) et `TRUE TRUE` pour « photo » quelle que soit la casse.
+
+# Partie B : Nettoyer un fichier de contacts
+
+## B1
+
+## B2
+
+## B3
+
+## B4
+
+## B5
+
+## B6
+
+## B7
+
+# Partie C : Analyser le journal d'un serveur
+
+## C1
+
+## C2
+
+## C3
+
+## C4
+
+## C5
+
+# Partie D : Analyse textuelle d'avis clients
+
+## D1
+
+## D2
+
+## D3
+
+## D4
+
+## D5

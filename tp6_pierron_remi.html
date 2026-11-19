@@ -1569,8 +1569,37 @@ produisent une chaîne vide.</td>
 <pre class="r"><code>str_split(&quot;a,b,,c&quot;, &quot;,&quot;)</code></pre>
 <pre><code>## [[1]]
 ## [1] &quot;a&quot; &quot;b&quot; &quot;&quot;  &quot;c&quot;</code></pre>
-<p><strong>Réponse :</strong> les résultats correspondent aux
-prédictions. Les pièges à retenir sont :</p>
+<p>Pour comparer sans recopier les résultats à la main, on range les
+prédictions et les résultats dans deux listes, puis on les compare une à
+une avec <code>identical()</code> :</p>
+<pre class="r"><code>predictions &lt;- list(
+  nchar       = 9L,
+  str_sub     = &quot;toire&quot;,
+  detect_1    = c(TRUE, TRUE, FALSE),
+  detect_2    = c(TRUE, FALSE, FALSE),
+  str_count   = 2L,
+  str_replace = &quot;baa&quot;,
+  str_extract = &quot;06&quot;,
+  str_split   = list(c(&quot;a&quot;, &quot;b&quot;, &quot;&quot;, &quot;c&quot;))
+)
+resultats &lt;- list(
+  nchar       = nchar(&quot;Été 2026 &quot;),
+  str_sub     = str_sub(&quot;Conservatoire&quot;, -5),
+  detect_1    = str_detect(c(&quot;a.b&quot;, &quot;axb&quot;, &quot;ab&quot;), &quot;a.b&quot;),
+  detect_2    = str_detect(c(&quot;a.b&quot;, &quot;axb&quot;, &quot;ab&quot;), &quot;a\\.b&quot;),
+  str_count   = str_count(&quot;banana&quot;, &quot;an&quot;),
+  str_replace = str_replace(&quot;aaa&quot;, &quot;a&quot;, &quot;b&quot;),
+  str_extract = str_extract(&quot;Tel : 06 12 34 56 78&quot;, &quot;\\d+&quot;),
+  str_split   = str_split(&quot;a,b,,c&quot;, &quot;,&quot;)
+)
+prediction_juste &lt;- map2_lgl(predictions, resultats, identical)
+prediction_juste</code></pre>
+<pre><code>##       nchar     str_sub    detect_1    detect_2   str_count str_replace 
+##        TRUE        TRUE        TRUE        TRUE        TRUE        TRUE 
+## str_extract   str_split 
+##        TRUE        TRUE</code></pre>
+<p><strong>Réponse :</strong> 8 prédictions sur 8 sont exactes, il n’y a
+donc pas de différence à expliquer. Les pièges à retenir sont :</p>
 <ul>
 <li><code>nchar()</code> compte des <strong>caractères</strong> et non
 des octets : « É » vaut 1 (il en vaudrait 2 avec
@@ -1614,6 +1643,7 @@ On peut corriger les petits mots de liaison entourés de tirets :</p>
 villes_propres</code></pre>
 <pre><code>## [1] &quot;Paris&quot;           &quot;Saint-Étienne&quot;   &quot;Aix-en-Provence&quot; &quot;Le Mans&quot;        
 ## [5] &quot;Nîmes&quot;</code></pre>
+<p>On obtient maintenant <code>&quot;Aix-en-Provence&quot;</code>.</p>
 </div>
 <div id="b.-alignement-à-droite-sur-20-caractères" class="section level3">
 <h3>b. Alignement à droite sur 20 caractères</h3>
@@ -1751,18 +1781,18 @@ n’est pas détecté. Il faut
 <pre><code>## [1] &quot;15/01/2026&quot;</code></pre>
 <pre class="r"><code>str_detect(c(&quot;Photo&quot;, &quot;photo&quot;), &quot;^photo&quot;)                           # 4. début « photo », toute casse</code></pre>
 <pre><code>## [1] FALSE  TRUE</code></pre>
-<pre class="r"><code>str_subset(x, &quot;\\.pdf$&quot;)                                                 # 1.</code></pre>
+<pre class="r"><code>(corr_1 &lt;- str_subset(x, &quot;\\.pdf$&quot;))                                                 # 1.</code></pre>
 <pre><code>## [1] &quot;rapport.pdf&quot;</code></pre>
-<pre class="r"><code>str_detect(&quot;prix : 1500 €&quot;, &quot;\\d+&quot;)                                      # 2.</code></pre>
+<pre class="r"><code>(corr_2 &lt;- str_detect(&quot;prix : 1500 €&quot;, &quot;\\d+&quot;))                                      # 2.</code></pre>
 <pre><code>## [1] TRUE</code></pre>
-<pre class="r"><code>str_replace(&quot;2026-01-15&quot;, &quot;^(\\d{4})-(\\d{2})-(\\d{2})$&quot;, &quot;\\3/\\2/\\1&quot;) # 3.</code></pre>
+<pre class="r"><code>(corr_3 &lt;- str_replace(&quot;2026-01-15&quot;, &quot;^(\\d{4})-(\\d{2})-(\\d{2})$&quot;, &quot;\\3/\\2/\\1&quot;)) # 3.</code></pre>
 <pre><code>## [1] &quot;15/01/2026&quot;</code></pre>
-<pre class="r"><code>str_detect(c(&quot;Photo&quot;, &quot;photo&quot;), regex(&quot;^photo&quot;, ignore_case = TRUE))     # 4.</code></pre>
+<pre class="r"><code>(corr_4 &lt;- str_detect(c(&quot;Photo&quot;, &quot;photo&quot;), regex(&quot;^photo&quot;, ignore_case = TRUE)))     # 4.</code></pre>
 <pre><code>## [1] TRUE TRUE</code></pre>
-<p><strong>Réponse :</strong> les versions corrigées renvoient bien le
-seul fichier PDF (<code>&quot;rapport.pdf&quot;</code>), <code>TRUE</code> pour la
-présence d’un nombre, <code>&quot;15/01/2026&quot;</code> pour la date (déjà
-correcte à l’origine) et <code>TRUE TRUE</code> pour « photo » quelle
+<p><strong>Réponse :</strong> les versions corrigées renvoient
+<code>&quot;rapport.pdf&quot;</code> comme fichier(s) PDF, <code>TRUE</code> pour
+la présence d’un nombre, <code>&quot;15/01/2026&quot;</code> pour la date (déjà
+correcte à l’origine) et <code>TRUE, TRUE</code> pour « photo » quelle
 que soit la casse.</p>
 </div>
 </div>
@@ -1770,24 +1800,482 @@ que soit la casse.</p>
 <h1>Partie B : Nettoyer un fichier de contacts</h1>
 <div id="b1" class="section level2">
 <h2>B1</h2>
+<p>Toutes les colonnes sont importées en texte
+(<code>col_character()</code>) : on veut voir les valeurs telles
+qu’elles ont été saisies, sans que <code>read_csv()</code> tente de
+deviner un type.</p>
+<pre class="r"><code>contacts &lt;- read_csv(&quot;data/contacts_bruts.csv&quot;,
+                     col_types = cols(.default = col_character()))
+dim(contacts)</code></pre>
+<pre><code>## [1] 60  6</code></pre>
+<p>Pour voir des formats variés, on affiche 10 lignes réparties sur tout
+le fichier (une ligne sur 6), en <code>data.frame</code> pour que les
+valeurs ne soient pas tronquées :</p>
+<pre class="r"><code>contacts |&gt;
+  slice(seq(1, nrow(contacts), by = 6)) |&gt;
+  as.data.frame()</code></pre>
+<pre><code>##      id              nom                     email       telephone
+## 1  C001   valérie   fall     valerie.fall@yahoo.fr            &lt;NA&gt;
+## 2  C007         Awa Faye         awa.faye@yahoo.fr      0724337204
+## 3  C013      sami   diop        sami.diop@yahoo.fr  06 52 63 68 30
+## 4  C019 wassim   le goff  wassim.legoff@outlook.fr      0605942424
+## 5  C025  LAMBERT Valérie valerie.lambert@gmail.com  06.37.15.35.13
+## 6  C031     zoé   garcia        zoe.garcia@free.fr  04.20.59.96.71
+## 7  C037   Pauline Haddad pauline.haddad@lecnam.net  04 85 92 03 37
+## 8  C043      MBAYE Fatou       FATOU.MBAYE@FREE.FR      0643083425
+## 9  C049   Djibril Girard   djibril.girard@yahoo.fr      0180357856
+## 10 C055      DIALLO Chen    CHEN.DIALLO@LECNAM.NET +33(0)751922467
+##                                    adresse inscription
+## 1               1 bd Gambetta, 75020 PARIS  24/08/2023
+## 2          85 rue Gambetta, 31000 TOULOUSE  02/09/2025
+## 3            62 Av. Gambetta, 35000 RENNES  2024-09-17
+## 4         94 Av. des Lilas, 33800 BORDEAUX  2024-09-14
+## 5        40 Av. Saint-Martin, 44000 Nantes  15/08/2024
+## 6       2 boulevard de la Paix, 69007 LYON    15-03-24
+## 7       1 avenue Jean Jaurès, 35000 RENNES    12-01-23
+## 8  82 avenue de la République, 75020 PARIS    22-06-24
+## 9      94 avenue Victor Hugo, 44000 Nantes  20/06/2024
+## 10             53 rue Gambetta, 06000 Nice  28/04/2024</code></pre>
+<pre class="r"><code># Valeurs manquantes (cases vides) par colonne
+colSums(is.na(contacts))</code></pre>
+<pre><code>##          id         nom       email   telephone     adresse inscription 
+##           0           0           1           1           0           0</code></pre>
+<p><strong>Réponse :</strong> le fichier contient 60 contacts et 6
+colonnes. Formats observés :</p>
+<ul>
+<li><code>id</code> : propre, de la forme <code>C001</code>,
+<code>C002</code>… ;</li>
+<li><code>nom</code> : cinq formes mélangées, « Prénom Nom »
+(<code>Chen Chevalier</code>), « NOM Prénom »
+(<code>DIALLO Quentin</code>), « Nom, Prénom »
+(<code>Wang, Moussa</code>), tout en minuscules avec des espaces en trop
+(<code>&quot;  valérie   fall &quot;</code>), ou tout en majuscules
+(<code>JADE GIRARD</code>) ;</li>
+<li><code>email</code> : casse variable
+(<code>GAEL.BENALI@YAHOO.FR</code>), et des adresses invalides
+(<code>@</code> manquant, <code>@@</code> doublé, domaine sans
+extension) ; 1 e-mail(s) manquant(s) ;</li>
+<li><code>telephone</code> : séparateurs variés (espaces, points, tirets
+ou rien), indicatif international <code>+33</code> avec ou sans
+<code>(0)</code>, des valeurs non numériques (<code>inconnu</code>) ou
+trop courtes ; 1 téléphone(s) manquant(s) ;</li>
+<li><code>adresse</code> : toujours « rue, code postal ville », mais la
+ville est tantôt en majuscules (<code>PARIS</code>), tantôt en casse
+normale (<code>Paris</code>), et les types de voie sont abrégés ou non
+(<code>Av.</code>, <code>bd</code>, <code>boulevard</code>) ;</li>
+<li><code>inscription</code> : trois formats de date,
+<code>jj/mm/aaaa</code>, <code>aaaa-mm-jj</code> et
+<code>jj-mm-aa</code>.</li>
+</ul>
 </div>
 <div id="b2" class="section level2">
 <h2>B2</h2>
+<div id="a.-prénom-et-nom" class="section level3">
+<h3>a. Prénom et nom</h3>
+<p>On nettoie d’abord les espaces avec <code>str_squish()</code>. Pour
+tester le cas « NOM Prénom », on isole le premier mot
+(<code>^\\S+</code>) et le deuxième mot (<code>word(nom, 2)</code>), et
+on teste chacun avec la regex <code>^[[:upper:]]+$</code> (qui reconnaît
+aussi les majuscules accentuées comme <code>É</code>). Dans chaque cas,
+on coupe au <strong>premier</strong> séparateur pour que les noms
+composés (« Le Goff ») restent entiers :</p>
+<ul>
+<li>« Nom, Prénom » : le nom est avant la virgule, le prénom après
+;</li>
+<li>« NOM Prénom » : le nom est le premier mot, le prénom tout le reste
+;</li>
+<li>« Prénom Nom » : le prénom est le premier mot, le nom tout le
+reste.</li>
+</ul>
+<pre class="r"><code>noms &lt;- contacts |&gt;
+  select(id, nom_brut = nom) |&gt;
+  mutate(
+    nom_brut = str_squish(nom_brut),
+    mot1 = str_extract(nom_brut, &quot;^\\S+&quot;),
+    mot2 = word(nom_brut, 2),
+    format = case_when(
+      str_detect(nom_brut, &quot;,&quot;) ~ &quot;Nom, Prénom&quot;,
+      str_detect(mot1, &quot;^[[:upper:]]+$&quot;) &amp; !str_detect(mot2, &quot;^[[:upper:]]+$&quot;) ~ &quot;NOM Prénom&quot;,
+      .default = &quot;Prénom Nom&quot;
+    ),
+    prenom = case_when(
+      format == &quot;Nom, Prénom&quot; ~ str_remove(nom_brut, &quot;^[^,]+,\\s*&quot;),
+      format == &quot;NOM Prénom&quot;  ~ str_remove(nom_brut, &quot;^\\S+\\s+&quot;),
+      .default                = mot1
+    ),
+    nom = case_when(
+      format == &quot;Nom, Prénom&quot; ~ str_extract(nom_brut, &quot;^[^,]+&quot;),
+      format == &quot;NOM Prénom&quot;  ~ mot1,
+      .default                = str_remove(nom_brut, &quot;^\\S+\\s+&quot;)
+    )
+  )
+
+noms |&gt; count(format)</code></pre>
+<pre><code>## # A tibble: 3 × 2
+##   format          n
+##   &lt;chr&gt;       &lt;int&gt;
+## 1 NOM Prénom      9
+## 2 Nom, Prénom     9
+## 3 Prénom Nom     42</code></pre>
+</div>
+<div id="b.-mise-en-forme" class="section level3">
+<h3>b. Mise en forme</h3>
+<pre class="r"><code>noms &lt;- noms |&gt;
+  mutate(prenom = str_to_title(prenom),
+         nom    = str_to_upper(nom))</code></pre>
+</div>
+<div id="c.-vérification" class="section level3">
+<h3>c. Vérification</h3>
+<p>On affiche 3 lignes de chaque format, puis les noms de plus de deux
+mots, qui sont les cas ambigus :</p>
+<pre class="r"><code>noms |&gt;
+  group_by(format) |&gt;
+  slice_head(n = 3) |&gt;
+  ungroup() |&gt;
+  select(id, nom_brut, format, prenom, nom) |&gt;
+  as.data.frame()</code></pre>
+<pre><code>##     id        nom_brut      format  prenom       nom
+## 1 C011  DIALLO Quentin  NOM Prénom Quentin    DIALLO
+## 2 C015     DURAND Dina  NOM Prénom    Dina    DURAND
+## 3 C025 LAMBERT Valérie  NOM Prénom Valérie   LAMBERT
+## 4 C010    Wang, Moussa Nom, Prénom  Moussa      WANG
+## 5 C012 Benali, Rokhaya Nom, Prénom Rokhaya    BENALI
+## 6 C016    Benali, Gaël Nom, Prénom    Gaël    BENALI
+## 7 C001    valérie fall  Prénom Nom Valérie      FALL
+## 8 C002     JADE GIRARD  Prénom Nom    Jade    GIRARD
+## 9 C003  Chen Chevalier  Prénom Nom    Chen CHEVALIER</code></pre>
+<pre class="r"><code>noms_longs &lt;- noms |&gt;
+  filter(str_count(nom_brut, &quot;\\S+&quot;) &gt; 2) |&gt;
+  select(id, nom_brut, format, prenom, nom)
+noms_longs |&gt; as.data.frame()</code></pre>
+<pre><code>##     id       nom_brut     format prenom       nom
+## 1 C019 wassim le goff Prénom Nom Wassim   LE GOFF
+## 2 C030   LE GOFF Nora Prénom Nom     Le GOFF NORA
+## 3 C050    Léa Le Goff Prénom Nom    Léa   LE GOFF</code></pre>
+<pre class="r"><code># Cas restant faux : nom composé en majuscules suivi du prénom (« LE GOFF Nora ») :
+# les deux premiers mots sont en majuscules, donc la règle bascule en « Prénom Nom »
+noms_problemes &lt;- noms |&gt;
+  filter(str_detect(nom_brut, &quot;^([[:upper:]]+ ){2,}[[:upper:]][[:lower:]]+$&quot;))
+noms_problemes |&gt; select(id, nom_brut, prenom, nom)</code></pre>
+<pre><code>## # A tibble: 1 × 4
+##   id    nom_brut     prenom nom      
+##   &lt;chr&gt; &lt;chr&gt;        &lt;chr&gt;  &lt;chr&gt;    
+## 1 C030  LE GOFF Nora Le     GOFF NORA</code></pre>
+<p><strong>Réponse :</strong> les 60 noms se répartissent en 9 « NOM
+Prénom », 9 « Nom, Prénom », 42 « Prénom Nom » (les noms en minuscules
+et tout en majuscules tombent dans « Prénom Nom », ce qui est correct
+pour eux). Les noms composés sont bien gérés quand ils sont en fin de
+chaîne (<code>wassim le goff</code>, <code>Léa Le Goff</code>). Il reste
+1 nom mal découpé : <code>LE GOFF Nora</code> (C030), qui donne le
+prénom « Le » et le nom « GOFF NORA ». Comme le nom composé est en
+majuscules, le deuxième mot (« GOFF ») l’est aussi et la règle « premier
+mot en majuscules, second non » ne s’applique pas. Il faudrait plutôt
+tester que <strong>le dernier</strong> mot n’est pas en majuscules et
+que <strong>tous les précédents</strong> le sont. Plus généralement,
+pour un nom saisi tout en majuscules ou tout en minuscules, rien ne
+permet de savoir avec certitude lequel des mots est le prénom : on
+suppose l’ordre « Prénom Nom ».</p>
+</div>
 </div>
 <div id="b3" class="section level2">
 <h2>B3</h2>
+<div id="a.-minuscules-et-validation" class="section level3">
+<h3>a. Minuscules et validation</h3>
+<p>Regex : des caractères autorisés <code>[a-z0-9._-]+</code>, un seul
+<code>@</code> (le <code>@</code> n’est pas dans les caractères
+autorisés, donc <code>@@</code> est refusé), un domaine
+<code>[a-z0-9.-]+</code>, un point <code>\\.</code>, puis 2 à 4 lettres,
+avec des ancres pour valider toute la chaîne.</p>
+<pre class="r"><code>motif_email &lt;- &quot;^[a-z0-9._-]+@[a-z0-9.-]+\\.[a-z]{2,4}$&quot;
+
+emails &lt;- contacts |&gt;
+  select(id, email) |&gt;
+  mutate(email = str_to_lower(email),
+         email_valide = str_detect(email, motif_email) &amp; !is.na(email))
+
+emails |&gt; count(email_valide)</code></pre>
+<pre><code>## # A tibble: 2 × 2
+##   email_valide     n
+##   &lt;lgl&gt;        &lt;int&gt;
+## 1 FALSE            6
+## 2 TRUE            54</code></pre>
+<p>Un e-mail manquant donne <code>NA</code> avec
+<code>str_detect()</code> : on le compte comme invalide
+(<code>&amp; !is.na(email)</code>).</p>
+</div>
+<div id="b.-e-mails-invalides" class="section level3">
+<h3>b. E-mails invalides</h3>
+<pre class="r"><code>emails_invalides &lt;- emails |&gt;
+  filter(!email_valide) |&gt;
+  left_join(noms |&gt; select(id, prenom, nom), by = &quot;id&quot;) |&gt;
+  select(id, prenom, nom, email)
+emails_invalides</code></pre>
+<pre><code>## # A tibble: 6 × 4
+##   id    prenom  nom     email                 
+##   &lt;chr&gt; &lt;chr&gt;   &lt;chr&gt;   &lt;chr&gt;                 
+## 1 C010  Moussa  WANG    moussa.wangyahoo.fr   
+## 2 C021  Pauline FALL    pauline.falloutlook.fr
+## 3 C026  Zoé     NDIAYE  zoe.ndiaye@outlook    
+## 4 C028  Ulysse  BLANC   ulysse.blanc@@free.fr 
+## 5 C041  Awa     MERCIER awa.mercier@gmail     
+## 6 C047  Nora    KONE    &lt;NA&gt;</code></pre>
+<p><strong>Réponse :</strong> 6 e-mails sont invalides, dont 1
+manquant(s). Les autres ont un <code>@</code> absent, doublé, ou un
+domaine sans extension.</p>
+</div>
+<div id="c.-domaines-les-plus-fréquents" class="section level3">
+<h3>c. Domaines les plus fréquents</h3>
+<pre class="r"><code>domaines &lt;- emails |&gt;
+  filter(email_valide) |&gt;
+  mutate(domaine = str_extract(email, &quot;(?&lt;=@).+$&quot;)) |&gt;
+  count(domaine, sort = TRUE)
+domaines</code></pre>
+<pre><code>## # A tibble: 6 × 2
+##   domaine        n
+##   &lt;chr&gt;      &lt;int&gt;
+## 1 yahoo.fr      15
+## 2 free.fr       11
+## 3 lecnam.net     9
+## 4 outlook.fr     8
+## 5 orange.fr      7
+## 6 gmail.com      4</code></pre>
+<p><strong>Réponse :</strong> parmi les 54 e-mails valides, les domaines
+les plus fréquents sont yahoo.fr (15), free.fr (11), lecnam.net (9).</p>
+</div>
 </div>
 <div id="b4" class="section level2">
 <h2>B4</h2>
+<div id="a.-normalisation" class="section level3">
+<h3>a. Normalisation</h3>
+<p>Étapes : remplacer <code>+33</code> (suivi éventuellement d’espaces
+et de <code>(0)</code>) par <code>0</code>, retirer tout ce qui n’est
+pas un chiffre (<code>\\D</code>), vérifier le format
+<code>^0\\d{9}$</code>, puis insérer les espaces par paires grâce aux
+groupes de capture.</p>
+<pre class="r"><code>tels &lt;- contacts |&gt;
+  select(id, telephone) |&gt;
+  mutate(
+    tel_chiffres = telephone |&gt;
+      str_replace(&quot;^\\+33\\s*(\\(0\\))?&quot;, &quot;0&quot;) |&gt;
+      str_remove_all(&quot;\\D&quot;),
+    tel = if_else(str_detect(tel_chiffres, &quot;^0\\d{9}$&quot;),
+                  str_replace(tel_chiffres,
+                              &quot;^(\\d{2})(\\d{2})(\\d{2})(\\d{2})(\\d{2})$&quot;,
+                              &quot;\\1 \\2 \\3 \\4 \\5&quot;),
+                  NA_character_)
+  )
+
+# Quelques formats d&#39;origine et leur résultat
+tels |&gt; slice(c(5, 8, 9, 15, 16, 33, 44)) |&gt; select(-tel_chiffres)</code></pre>
+<pre><code>## # A tibble: 7 × 3
+##   id    telephone         tel           
+##   &lt;chr&gt; &lt;chr&gt;             &lt;chr&gt;         
+## 1 C005  0457052677        04 57 05 26 77
+## 2 C008  01.72.83.18.14    01 72 83 18 14
+## 3 C009  06-08-50-10-27    06 08 50 10 27
+## 4 C015  +33 6 59 38 97 79 06 59 38 97 79
+## 5 C016  +33(0)606357730   06 06 35 77 30
+## 6 C033  inconnu           &lt;NA&gt;          
+## 7 C044  06 12 34          &lt;NA&gt;</code></pre>
+<pre class="r"><code># Numéros rejetés
+tels |&gt; filter(is.na(tel)) |&gt; select(id, telephone)</code></pre>
+<pre><code>## # A tibble: 3 × 2
+##   id    telephone
+##   &lt;chr&gt; &lt;chr&gt;    
+## 1 C001  &lt;NA&gt;     
+## 2 C033  inconnu  
+## 3 C044  06 12 34</code></pre>
+</div>
+<div id="b.-numéros-valides-et-mobiles" class="section level3">
+<h3>b. Numéros valides et mobiles</h3>
+<pre class="r"><code>n_tel_valides &lt;- sum(!is.na(tels$tel))
+n_mobiles &lt;- sum(str_detect(tels$tel, &quot;^0[67]&quot;), na.rm = TRUE)
+n_tel_valides</code></pre>
+<pre><code>## [1] 57</code></pre>
+<pre class="r"><code>n_mobiles</code></pre>
+<pre><code>## [1] 36</code></pre>
+<p><strong>Réponse :</strong> 57 numéros sur 60 sont valides (les 3
+autres sont vides, non numériques ou trop courts), dont 36 mobiles (06
+ou 07), soit 63 % des numéros valides.</p>
+</div>
+<div id="c.-répartition-des-fixes-par-zone" class="section level3">
+<h3>c. Répartition des fixes par zone</h3>
+<pre class="r"><code>zones_fixes &lt;- tels |&gt;
+  filter(str_detect(tel, &quot;^0[1-5]&quot;)) |&gt;
+  mutate(zone = case_when(
+    str_starts(tel, &quot;01&quot;) ~ &quot;01 (Île-de-France)&quot;,
+    str_starts(tel, &quot;02&quot;) ~ &quot;02 (Nord-Ouest)&quot;,
+    str_starts(tel, &quot;03&quot;) ~ &quot;03 (Nord-Est)&quot;,
+    str_starts(tel, &quot;04&quot;) ~ &quot;04 (Sud-Est)&quot;,
+    str_starts(tel, &quot;05&quot;) ~ &quot;05 (Sud-Ouest)&quot;
+  )) |&gt;
+  count(zone)
+zones_fixes</code></pre>
+<pre><code>## # A tibble: 2 × 2
+##   zone                   n
+##   &lt;chr&gt;              &lt;int&gt;
+## 1 01 (Île-de-France)    11
+## 2 04 (Sud-Est)          10</code></pre>
+<p><strong>Réponse :</strong> on compte 21 numéros fixes : 11 en zone 01
+(Île-de-France), 10 en zone 04 (Sud-Est). Les autres zones
+n’apparaissent pas.</p>
+</div>
 </div>
 <div id="b5" class="section level2">
 <h2>B5</h2>
+<p>Le motif découpe l’adresse en : tout jusqu’à la virgule
+(<code>rue</code>), la virgule et l’espace (non nommés, donc non
+conservés), 5 chiffres (<code>cp</code>), un espace, puis le reste
+(<code>ville</code>). Le code postal reste en texte pour garder le zéro
+initial (<code>06000</code>).</p>
+<pre class="r"><code>adresses &lt;- contacts |&gt;
+  select(id, adresse) |&gt;
+  separate_wider_regex(
+    adresse,
+    patterns = c(rue = &quot;[^,]+&quot;, &quot;,\\s*&quot;, cp = &quot;\\d{5}&quot;, &quot;\\s+&quot;, ville = &quot;.+&quot;)
+  ) |&gt;
+  mutate(ville       = str_to_title(ville),
+         departement = str_sub(cp, 1, 2))
+
+adresses |&gt; slice_head(n = 5)</code></pre>
+<pre><code>## # A tibble: 5 × 5
+##   id    rue                          cp    ville    departement
+##   &lt;chr&gt; &lt;chr&gt;                        &lt;chr&gt; &lt;chr&gt;    &lt;chr&gt;      
+## 1 C001  1 bd Gambetta                75020 Paris    75         
+## 2 C002  38 impasse Pasteur           59000 Lille    59         
+## 3 C003  66 boulevard de la Paix      75011 Paris    75         
+## 4 C004  46 avenue de la Paix         75011 Paris    75         
+## 5 C005  9 boulevard de la République 31000 Toulouse 31</code></pre>
+<pre class="r"><code>villes_contacts &lt;- adresses |&gt; count(ville, sort = TRUE)
+villes_contacts</code></pre>
+<pre><code>## # A tibble: 12 × 2
+##    ville           n
+##    &lt;chr&gt;       &lt;int&gt;
+##  1 Paris           9
+##  2 Toulouse        8
+##  3 Rennes          7
+##  4 Strasbourg      6
+##  5 Lyon            5
+##  6 Marseille       5
+##  7 Nantes          5
+##  8 Bordeaux        4
+##  9 Nice            4
+## 10 Saint-Denis     3
+## 11 Lille           2
+## 12 Montpellier     2</code></pre>
+<p><strong>Réponse :</strong> une fois la casse harmonisée, les contacts
+se répartissent sur 12 villes. La plus représentée est Paris avec 9
+contacts, la moins représentée Montpellier avec 2. Sans
+<code>str_to_title()</code>, « PARIS » et « Paris » auraient été
+comptées comme deux villes différentes.</p>
 </div>
 <div id="b6" class="section level2">
 <h2>B6</h2>
+<div id="a.-formats-des-dates" class="section level3">
+<h3>a. Formats des dates</h3>
+<pre class="r"><code>dates &lt;- contacts |&gt;
+  select(id, inscription) |&gt;
+  mutate(format_date = case_when(
+    str_detect(inscription, &quot;^\\d{2}/\\d{2}/\\d{4}$&quot;) ~ &quot;jj/mm/aaaa&quot;,
+    str_detect(inscription, &quot;^\\d{4}-\\d{2}-\\d{2}$&quot;) ~ &quot;aaaa-mm-jj&quot;,
+    str_detect(inscription, &quot;^\\d{2}-\\d{2}-\\d{2}$&quot;) ~ &quot;jj-mm-aa&quot;
+  ))
+
+formats_dates &lt;- dates |&gt; count(format_date)
+formats_dates</code></pre>
+<pre><code>## # A tibble: 3 × 2
+##   format_date     n
+##   &lt;chr&gt;       &lt;int&gt;
+## 1 aaaa-mm-jj     13
+## 2 jj-mm-aa        9
+## 3 jj/mm/aaaa     38</code></pre>
+<p><strong>Réponse :</strong> 13 dates au format aaaa-mm-jj, 9 dates au
+format jj-mm-aa, 38 dates au format jj/mm/aaaa, soit 60 dates reconnues
+sur 60.</p>
+</div>
+<div id="b.-conversion" class="section level3">
+<h3>b. Conversion</h3>
+<p><code>case_when()</code> évalue toutes les conversions sur tout le
+vecteur : <code>dmy()</code> et <code>ymd()</code> échoueraient (avec un
+avertissement) sur les dates de l’autre format.
+<code>quiet = TRUE</code> supprime ces avertissements, seul le bon
+résultat étant retenu pour chaque ligne. <code>dmy()</code> gère aussi
+l’année sur 2 chiffres (<code>24</code> → 2024).</p>
+<pre class="r"><code>dates &lt;- dates |&gt;
+  mutate(date = case_when(
+    format_date %in% c(&quot;jj/mm/aaaa&quot;, &quot;jj-mm-aa&quot;) ~ dmy(inscription, quiet = TRUE),
+    format_date == &quot;aaaa-mm-jj&quot;                  ~ ymd(inscription, quiet = TRUE)
+  ))
+
+dates |&gt; group_by(format_date) |&gt; slice_head(n = 2) |&gt; ungroup()</code></pre>
+<pre><code>## # A tibble: 6 × 4
+##   id    inscription format_date date      
+##   &lt;chr&gt; &lt;chr&gt;       &lt;chr&gt;       &lt;date&gt;    
+## 1 C008  2025-09-05  aaaa-mm-jj  2025-09-05
+## 2 C009  2025-03-02  aaaa-mm-jj  2025-03-02
+## 3 C022  19-05-24    jj-mm-aa    2024-05-19
+## 4 C024  23-12-24    jj-mm-aa    2024-12-23
+## 5 C001  24/08/2023  jj/mm/aaaa  2023-08-24
+## 6 C002  20/02/2025  jj/mm/aaaa  2025-02-20</code></pre>
+</div>
+<div id="c.-vérification-et-inscriptions-par-année" class="section level3">
+<h3>c. Vérification et inscriptions par année</h3>
+<pre class="r"><code>n_dates_na &lt;- sum(is.na(dates$date))
+n_dates_na</code></pre>
+<pre><code>## [1] 0</code></pre>
+<pre class="r"><code>inscriptions_annee &lt;- dates |&gt; count(annee = year(date))
+inscriptions_annee</code></pre>
+<pre><code>## # A tibble: 3 × 2
+##   annee     n
+##   &lt;dbl&gt; &lt;int&gt;
+## 1  2023    17
+## 2  2024    21
+## 3  2025    22</code></pre>
+<p><strong>Réponse :</strong> 0 date manquante après conversion, toutes
+les dates ont été reconnues. Les inscriptions vont du 12/01/2023 au
+05/09/2025 : 17 en 2023, 21 en 2024, 22 en 2025.</p>
+</div>
 </div>
 <div id="b7" class="section level2">
 <h2>B7</h2>
+<pre class="r"><code>contacts_propres &lt;- contacts |&gt;
+  select(id) |&gt;
+  left_join(noms |&gt; select(id, prenom, nom), by = &quot;id&quot;) |&gt;
+  left_join(emails |&gt;
+              transmute(id, email = if_else(email_valide, email, NA_character_)),
+            by = &quot;id&quot;) |&gt;
+  left_join(tels |&gt; select(id, tel), by = &quot;id&quot;) |&gt;
+  left_join(adresses |&gt; select(id, cp, ville), by = &quot;id&quot;) |&gt;
+  left_join(dates |&gt; select(id, inscription = date), by = &quot;id&quot;)
+
+contacts_propres</code></pre>
+<pre><code>## # A tibble: 60 × 8
+##    id    prenom   nom       email                  tel   cp    ville inscription
+##    &lt;chr&gt; &lt;chr&gt;    &lt;chr&gt;     &lt;chr&gt;                  &lt;chr&gt; &lt;chr&gt; &lt;chr&gt; &lt;date&gt;     
+##  1 C001  Valérie  FALL      valerie.fall@yahoo.fr  &lt;NA&gt;  75020 Paris 2023-08-24 
+##  2 C002  Jade     GIRARD    jade.girard@free.fr    04 5… 59000 Lille 2025-02-20 
+##  3 C003  Chen     CHEVALIER chen.chevalier@orange… 01 0… 75011 Paris 2025-08-20 
+##  4 C004  Awa      NDIAYE    awa.ndiaye@lecnam.net  01 9… 75011 Paris 2024-09-02 
+##  5 C005  Gaël     MBAYE     gael.mbaye@lecnam.net  04 5… 31000 Toul… 2025-07-22 
+##  6 C006  Rokhaya  BENALI    rokhaya.benali@yahoo.… 06 4… 44000 Nant… 2025-02-20 
+##  7 C007  Awa      FAYE      awa.faye@yahoo.fr      07 2… 31000 Toul… 2025-09-02 
+##  8 C008  Clémence GARCIA    clemence.garcia@orang… 01 7… 34000 Mont… 2025-09-05 
+##  9 C009  Jade     MARTIN    jade.martin@lecnam.net 06 0… 93200 Sain… 2025-03-02 
+## 10 C010  Moussa   WANG      &lt;NA&gt;                   07 7… 13005 Mars… 2023-07-14 
+## # ℹ 50 more rows</code></pre>
+<pre class="r"><code>dir.create(&quot;sorties&quot;, showWarnings = FALSE)
+write_csv(contacts_propres, &quot;sorties/contacts_propres.csv&quot;)
+
+n_complets &lt;- sum(complete.cases(contacts_propres))
+colSums(is.na(contacts_propres))</code></pre>
+<pre><code>##          id      prenom         nom       email         tel          cp 
+##           0           0           0           6           3           0 
+##       ville inscription 
+##           0           0</code></pre>
+<p><strong>Réponse :</strong> le fichier
+<code>sorties/contacts_propres.csv</code> contient 60 contacts. 51 sont
+<strong>complets</strong> (85 %) ; les 9 autres ont un e-mail invalide
+(6 cas) et/ou un téléphone invalide (3 cas).</p>
 </div>
 </div>
 <div id="partie-c-analyser-le-journal-dun-serveur" class="section level1">

@@ -13,6 +13,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 ```
 
+Dépôt GitHub : <https://github.com/remipierron/TP6_R>
+
 # Partie A : Fonctions de texte et premières regex
 
 ## A1
